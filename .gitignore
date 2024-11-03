@@ -3,3 +3,6 @@ backend/model/modelo_temperatura_random_forest.pkl
 
 # Ignorar todos los archivos .pkl
 *.pkl
+
+# Ignorar el archivo db.sqlite3
+db.sqlite3

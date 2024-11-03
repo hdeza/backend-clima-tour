@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 from rest_framework import status
 # Cargar el modelo
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-model_path = os.path.join(BASE_DIR,'modelo', 'modelo_temperatura_random_forest.pkl')
+model_path = os.path.join(BASE_DIR,'model', 'modelo_temperatura_random_forest.pkl')
 model = joblib.load(model_path) 
 
 class PrediccionTemperatura(APIView):
