@@ -1,0 +1,5 @@
+# Ignorar el archivo del modelo de IA
+backend/model/modelo_temperatura_random_forest.pkl
+
+# Ignorar todos los archivos .pkl
+*.pkl
