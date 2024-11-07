@@ -26,4 +26,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     # Incluimos las URLs de la aplicación 'api' en el prefijo 'api/'.
     path('api/', include('api.urls')),
+
+    path('gemini/', include('gemini_proxy.urls')),  # Incluye las URLs de la app gemini_proxy
+    
 ]

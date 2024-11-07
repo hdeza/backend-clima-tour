@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'api.apps.ApiConfig', #colocamos nuestra aplicación
+    'gemini_proxy.apps.GeminiProxyConfig',
     'rest_framework', # agregamos el rest_framework que nos permite generar el restApi
     'corsheaders', # con esto configuramos el servidor para que permita acceso de otras direcciones
 ]
@@ -130,3 +131,10 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+from dotenv import load_dotenv
+import os
+
+# Cargar las variables de entorno del archivo .env
+load_dotenv()
