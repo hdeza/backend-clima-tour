@@ -22,10 +22,16 @@ class ItineraryView(APIView):
 
         try:
             # Enviar el prompt a la API de Gemini
-            response = model.generate_content(prompt)
+            #temperature=0.7,  # Control creativity and randomness
+            #max_tokens=150,   # Limit output length
+            #top_p=0.9,        # Focus on probable tokens
+            #presence_penalty=0.5,  # Penalize repeated words
+            #frequency_penalty=0.5   # Penalize repeated phrases
+            response = model.generate_content(prompt,temperature=0.7, max_tokens= 150, top_p=0.9,presence_penalty=0.5,frequency_penalty=0.5 )
             return Response(response.text, status=status.HTTP_200_OK)
         
         except Exception as e:
+            print(f"Error generating content: {str(e)}")
             return Response({"error": str(e)}, status=400)
 
 
