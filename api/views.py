@@ -45,7 +45,7 @@ class PrediccionTemperatura(APIView):
             prediccion = model.predict([features])[0]
             
             # Devolvemos la predicción como respuesta en formato JSON con código 200 (OK).
-            return Response({'temperatura_predicha': prediccion}, status=status.HTTP_200_OK)
+            return Response({prediccion}, status=status.HTTP_200_OK)
         except Exception as e:
             # En caso de un error inesperado, devolvemos el mensaje de error con código 500 (Internal Server Error).
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
