@@ -15,19 +15,31 @@ class ItineraryView(APIView):
         days = request.data.get("days")
 
         # Define el prompt con los parámetros proporcionados
-        prompt = f"Genera un itinerario breve y claro de {days} días para un viaje a {city} con una temperatura promedio de {temperature}°C. El itinerario debe describir las actividades que se pueden realizar cada día, presentando el título de cada día seguido de una lista de actividades. Cada actividad debe incluir: título, descripción y recomendación adicional. El formato debe ser un solo bloque de texto, fácil de leer, sin ningún tipo de formato de código, Markdown o JSON. El texto debe ser claro, directo y fluido para que el usuario pueda entender fácilmente qué hacer durante cada día del viaje. "
+        prompt = f"Imagina que eres un guía local en {city} y tienes la misión de llevarme por una experiencia inolvidable de {days} días en esta ciudad. La temperatura promedio será de unos {temperature}°C, así que hazme recomendaciones de actividades cada día para aprovechar al máximo. Cuéntamelo todo como si estuviéramos charlando en persona: quiero que cada actividad suene emocionante y que me des sugerencias prácticas para disfrutarlo al máximo, como consejos sobre qué llevar o detalles curiosos del lugar. Descríbelo todo de manera fluida y amena, sin listas ni secciones. ¡Llévame día a día por la aventura como si me estuvieras acompañando!, ademas la respuesta debe ser en ingles"
 
         # Instanciar el modelo de Gemini 
         model = genai.GenerativeModel('gemini-1.5-flash')
 
         try:
             # Enviar el prompt a la API de Gemini
-            #temperature=0.7,  # Control creativity and randomness
-            #max_tokens=150,   # Limit output length
-            #top_p=0.9,        # Focus on probable tokens
-            #presence_penalty=0.5,  # Penalize repeated words
-            #frequency_penalty=0.5   # Penalize repeated phrases
-            response = model.generate_content(prompt,temperature=0.7, max_tokens= 150, top_p=0.9,presence_penalty=0.5,frequency_penalty=0.5 )
+            
+            #candidateCount especifica la cantidad de respuestas generadas que se mostrarán. Actualmente, este valor solo se puede establecer en 1. 
+            # Si no la estableces, el valor predeterminado será 1.
+
+            #stopSequences especifica el conjunto de secuencias de caracteres (hasta 5) que detendrán la generación de resultados. 
+            # Si se especifica, la API se detendrá cuando aparezca un stop_sequence por primera vez. La secuencia de detención no se incluirá como parte de la respuesta.
+
+            #maxOutputTokens establece la cantidad máxima de tokens que se deben incluir en un candidato.
+
+            #temperature controla la aleatorización de la salida. Usa valores más altos para obtener respuestas más creativas 
+            # y valores más bajos para respuestas más deterministas. Los valores pueden variar de [0.0, 2.0].
+
+            response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(
+        # Only one candidate for now.
+        candidate_count=1,
+        max_output_tokens=600,
+        temperature=0.7,
+    ), )
             return Response(response.text, status=status.HTTP_200_OK)
         
         except Exception as e:
