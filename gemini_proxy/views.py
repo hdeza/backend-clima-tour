@@ -15,7 +15,7 @@ class ItineraryView(APIView):
         days = request.data.get("days")
 
         # Define el prompt con los parámetros proporcionados
-        prompt = f"Imagina que eres un guía local en {city} y tienes la misión de llevarme por una experiencia inolvidable de {days} días en esta ciudad. La temperatura promedio será de unos {temperature}°C, así que hazme recomendaciones de actividades cada día para aprovechar al máximo. Cuéntamelo todo como si estuviéramos charlando en persona: quiero que cada actividad suene emocionante y que me des sugerencias prácticas para disfrutarlo al máximo, como consejos sobre qué llevar o detalles curiosos del lugar. Descríbelo todo de manera fluida y amena, sin listas ni secciones. ¡Llévame día a día por la aventura como si me estuvieras acompañando!, ademas la respuesta debe ser en ingles"
+        prompt = f"Imagine you're a local guide in {city} and your mission is to take me on an unforgettable {days}-day experience in this city. The average temperature will be around {temperature}°C, so recommend exciting activities for each day to make the most of it. Tell me everything as if we were chatting in person: I want every activity to sound exciting, and give me practical suggestions on how to enjoy it to the fullest, such as tips on what to bring or interesting details about the place. Describe everything in a smooth, engaging way, without lists or sections. Take me day by day through the adventure as if you were accompanying me! The response must be in English. Please ensure that the total response, including both your input and output, does not exceed 800 tokens."
 
         # Instanciar el modelo de Gemini 
         model = genai.GenerativeModel('gemini-1.5-flash')
@@ -37,7 +37,7 @@ class ItineraryView(APIView):
             response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(
         # Only one candidate for now.
         candidate_count=1,
-        max_output_tokens=600,
+        max_output_tokens=800,
         temperature=0.7,
     ), )
             return Response(response.text, status=status.HTTP_200_OK)
