@@ -5,6 +5,7 @@ import os      # Para manejar rutas de archivos en el sistema.
 from rest_framework.response import Response  # Para crear respuestas HTTP en la API.
 from rest_framework.views import APIView  # Para definir vistas basadas en API.
 from rest_framework import status  # Para manejar códigos de estado HTTP.
+import pandas as pd  # Para manejar datos en formato tabular.
 
 # Cargar el modelo de predicción.
 # BASE_DIR obtiene el directorio base del proyecto, que es útil para construir rutas relativas.
@@ -23,17 +24,17 @@ class PrediccionTemperatura(APIView):
         
         try:
             # Creamos una lista con las características necesarias para el modelo de predicción.
-            features = [
-                data.get('tavg'),      # Temperatura promedio
-                data.get('tmin'),      # Temperatura mínima
-                data.get('tmax'),      # Temperatura máxima
-                data.get('prcp'),      # Precipitación
-                data.get('wdir'),      # Dirección del viento
-                data.get('wspd'),      # Velocidad del viento
-                data.get('pres'),      # Presión atmosférica
-                data.get('latitude'),  # Latitud
-                data.get('longitude')   # Longitud
-            ]
+            features = {
+                'tavg': data.get('tavg'),      
+                'tmin': data.get('tmin'),      
+                'tmax': data.get('tmax'),      
+                'prcp': data.get('prcp'),      
+                'wdir': data.get('wdir'),      
+                'wspd': data.get('wspd'),      
+                'pres': data.get('pres'),      
+                'latitude': data.get('latitude'),  
+                'longitude': data.get('longitude')
+            }
             
             # Verificamos que no haya valores nulos o faltantes en las características.
             if None in features:
@@ -42,7 +43,8 @@ class PrediccionTemperatura(APIView):
             
             # Realizamos la predicción utilizando el modelo cargado.
             # La función predict espera una lista de listas, por lo que envolvemos features en otra lista.
-            prediccion = model.predict([features])[0]
+            df_dia = pd.DataFrame([features])
+            prediccion = model.predict(df_dia)[0]
             
             # Devolvemos la predicción como respuesta en formato JSON con código 200 (OK).
             return Response({prediccion}, status=status.HTTP_200_OK)
