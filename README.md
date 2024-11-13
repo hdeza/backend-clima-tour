@@ -48,9 +48,8 @@ To install and run the project, follow the steps below:
    ```
 3. Install dependencies:
   ```bash
-  python -m venv venv
-  source venv/bin/activate  # On Windows use: venv\Scripts\activate
- ```
+    pip install -r requirements.txt
+    ```
 4. Run migrations:
  ```bash
   python manage.py migrate
