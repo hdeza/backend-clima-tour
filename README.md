@@ -49,7 +49,7 @@ To install and run the project, follow the steps below:
 3. Install dependencies:
   ```bash
     pip install -r requirements.txt
-    ```
+  ```
 4. Run migrations:
  ```bash
   python manage.py migrate
