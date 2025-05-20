@@ -9,3 +9,6 @@ db.sqlite3
 
 # Ignorar las variables de entorno
 *.env
+
+# Ignorar el archivo de configuración secreta
+config

@@ -11,9 +11,19 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+import firebase_admin
+from firebase_admin import credentials
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+FIREBASE_CRED_PATH = os.path.join(BASE_DIR, 'config/firebase_key.json')
+
+if not firebase_admin._apps:
+    cred = credentials.Certificate(FIREBASE_CRED_PATH)
+    firebase_admin.initialize_app(cred)
+
 
 
 # Quick-start development settings - unsuitable for production
@@ -47,7 +57,15 @@ INSTALLED_APPS = [
     'gemini_proxy.apps.GeminiProxyConfig',
     'rest_framework', # agregamos el rest_framework que nos permite generar el restApi
     'corsheaders', # con esto configuramos el servidor para que permita acceso de otras direcciones
+    'backend'
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'utils.firebase_auth.FirebaseAuthentication',
+    )
+}
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
