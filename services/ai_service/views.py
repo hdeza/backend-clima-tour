@@ -1,9 +1,10 @@
-
 import os
 import google.generativeai as genai
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status  # Para manejar códigos de estado HTTP.
+from django.conf import settings
+
 # Configura la API de Gemini
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
@@ -24,7 +25,6 @@ class ItineraryView(APIView):
             # Enviar el prompt a la API de Gemini
             
             #candidateCount especifica la cantidad de respuestas generadas que se mostrarán. Actualmente, este valor solo se puede establecer en 1. 
-            # Si no la estableces, el valor predeterminado será 1.
 
             #stopSequences especifica el conjunto de secuencias de caracteres (hasta 5) que detendrán la generación de resultados. 
             # Si se especifica, la API se detendrá cuando aparezca un stop_sequence por primera vez. La secuencia de detención no se incluirá como parte de la respuesta.
@@ -55,4 +55,27 @@ class ItineraryView(APIView):
 #  "temperature": 20,
 #  "days": 2
 #}
+
+class GeminiProxyView(APIView):
+    def post(self, request):
+        try:
+            prompt = request.data.get('prompt')
+            if not prompt:
+                return Response({'error': 'Prompt is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Configurar la API de Gemini
+            genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
+            model = genai.GenerativeModel('gemini-pro')
+            
+            # Generar respuesta
+            response = model.generate_content(prompt)
+            
+            return Response({
+                'response': response.text
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

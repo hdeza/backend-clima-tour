@@ -1,5 +1,5 @@
 # Importamos los módulos necesarios de Django y otras bibliotecas.
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 #import joblib  # Para cargar el modelo de Machine Learning.
 import os      # Para manejar rutas de archivos en el sistema.
 from rest_framework.response import Response  # Para crear respuestas HTTP en la API.
@@ -7,127 +7,78 @@ from rest_framework.views import APIView  # Para definir vistas basadas en API.
 from rest_framework import status  # Para manejar códigos de estado HTTP.
 #import pandas as pd  # Para manejar datos en formato tabular.
 from rest_framework.permissions import IsAuthenticated
+from rest_framework import viewsets
+import requests
+from django.conf import settings
+from datetime import datetime, timedelta
 
-from api.models import Itinerary, Activity
-from api.serializers import ItinerarySerializer, ActivitySerializer
+from .models import Itinerary, Activity
+from .serializers import ItinerarySerializer, ActivitySerializer
 
 
 class ItinerariesView(APIView):
-    permission_classes = [IsAuthenticated]
-
     def get(self, request):
-        itineraries = Itinerary.objects.filter(user=request.user)
+        itineraries = Itinerary.objects.all()
         serializer = ItinerarySerializer(itineraries, many=True)
         return Response(serializer.data)
 
     def post(self, request):
         serializer = ItinerarySerializer(data=request.data)
         if serializer.is_valid():
-            # Asignamos el usuario autenticado
-            serializer.save(user=request.user)
+            serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ItineraryDetailsView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get_object(self, pk, user):
-        try:
-            return Itinerary.objects.get(pk=pk, user=user)
-        except Itinerary.DoesNotExist:
-            return None
-
     def get(self, request, pk):
-        itinerary = self.get_object(pk, request.user)
-        if not itinerary:
-            return Response({"error": "Ups! Itinenary not found."}, status=status.HTTP_404_NOT_FOUND)
+        itinerary = get_object_or_404(Itinerary, pk=pk)
         serializer = ItinerarySerializer(itinerary)
         return Response(serializer.data)
 
     def put(self, request, pk):
-        itinerary = self.get_object(pk, request.user)
-        if not itinerary:
-            return Response({"error": "Ups! Itinenary not found."}, status=status.HTTP_404_NOT_FOUND)
-        serializer = ItinerarySerializer(itinerary, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save(user=request.user)  # Asegura que no cambie el usuario
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def delete(self, request, pk):
-        itinerary = self.get_object(pk, request.user)
-        if not itinerary:
-            return Response({"error": "Ups! Itinenary not found."}, status=status.HTTP_404_NOT_FOUND)
-        itinerary.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class ActivityListCreateView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        # Solo actividades de itinerarios del usuario autenticado
-        activities = Activity.objects.filter(itinerary__user=request.user)
-        serializer = ActivitySerializer(activities, many=True)
-        return Response(serializer.data)
-
-    def post(self, request):
-        itinerary_id = request.data.get('itinerary')
-
-        # Validar que el itinerario pertenece al usuario autenticado
-        try:
-            itinerary = Itinerary.objects.get(id=itinerary_id, user=request.user)
-        except Itinerary.DoesNotExist:
-            return Response({"error": "Ups! The itinerary is invalid or does not match the user."}, status=status.HTTP_403_FORBIDDEN)
-
-        serializer = ActivitySerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(itinerary=itinerary)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-class ActivityDetailView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get_object(self, pk, user):
-        try:
-            activity = Activity.objects.select_related('itinerary').get(pk=pk)
-            if activity.itinerary.user != user:
-                return None
-            return activity
-        except Activity.DoesNotExist:
-            return None
-
-    def get(self, request, pk):
-        activity = self.get_object(pk, request.user)
-        if not activity:
-            return Response({"error": "Oh oh! Antivity not found or unauthorized."}, status=status.HTTP_404_NOT_FOUND)
-        serializer = ActivitySerializer(activity)
-        return Response(serializer.data)
-
-    def put(self, request, pk):
-        activity = self.get_object(pk, request.user)
-        if not activity:
-            return Response({"error": "Oh oh! Antivity not found or unauthorized."}, status=status.HTTP_404_NOT_FOUND)
-
-        # Validar si el usuario intenta cambiar el itinerario
-        if "itinerary" in request.data:
-            try:
-                Itinerary.objects.get(id=request.data["itinerary"], user=request.user)
-            except Itinerary.DoesNotExist:
-                return Response({"error": "You may not transfer this activity to an Itinerary other than your own."}, status=status.HTTP_403_FORBIDDEN)
-
-        serializer = ActivitySerializer(activity, data=request.data, partial=True)
+        itinerary = get_object_or_404(Itinerary, pk=pk)
+        serializer = ItinerarySerializer(itinerary, data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk):
-        activity = self.get_object(pk, request.user)
-        if not activity:
-            return Response({"error": "Oh oh! Antivity not found or unauthorized."}, status=status.HTTP_404_NOT_FOUND)
+        itinerary = get_object_or_404(Itinerary, pk=pk)
+        itinerary.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ActivityListCreateView(APIView):
+    def get(self, request):
+        activities = Activity.objects.all()
+        serializer = ActivitySerializer(activities, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = ActivitySerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class ActivityDetailView(APIView):
+    def get(self, request, pk):
+        activity = get_object_or_404(Activity, pk=pk)
+        serializer = ActivitySerializer(activity)
+        return Response(serializer.data)
+
+    def put(self, request, pk):
+        activity = get_object_or_404(Activity, pk=pk)
+        serializer = ActivitySerializer(activity, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        activity = get_object_or_404(Activity, pk=pk)
         activity.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 

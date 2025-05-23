@@ -30,23 +30,26 @@ class City(models.Model):
 
 
 class Itinerary(models.Model):
-    id = models.AutoField(primary_key=True)
-    user = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='itineraries')
-    city = models.CharField(max_length=128)
-    creation_date = models.DateTimeField(auto_now_add=True)
-    predicted_temperature = models.FloatField(null=True, blank=True)
-    state = models.CharField(max_length=100)
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    start_date = models.DateField()
+    end_date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Itinerario de {self.user.email} en {self.city} - {self.state}"
+        return self.title
 
 
 class Activity(models.Model):
-    id = models.AutoField(primary_key=True)
     itinerary = models.ForeignKey(Itinerary, on_delete=models.CASCADE, related_name='activities')
-    hour = models.TimeField()
+    title = models.CharField(max_length=200)
     description = models.TextField()
-    state = models.CharField(max_length=100)
+    date = models.DateField()
+    location = models.CharField(max_length=200)
+    weather_condition = models.CharField(max_length=100, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.hour} - {self.description[:20]}..."
+        return f"{self.title} - {self.date}"
