@@ -8,23 +8,38 @@ from rest_framework import status  # Para manejar códigos de estado HTTP.
 #import pandas as pd  # Para manejar datos en formato tabular.
 from rest_framework.permissions import IsAuthenticated
 
-from api.models import Itinerary, Activity
-from api.serializers import ItinerarySerializer, ActivitySerializer
+from api.serializers import ItineraryDetailSerializer
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
+from .models import Itinerary, Activity
+from .serializers import ActivitySerializer
 
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
+from .models import Itinerary, Activity
+from .serializers import (
+    ItinerarySerializer,
+    ItineraryDetailSerializer,
+    ActivitySerializer
+)
 
 class ItinerariesView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        itineraries = Itinerary.objects.filter(user=request.user)
-        serializer = ItinerarySerializer(itineraries, many=True)
+        itineraries = Itinerary.objects.filter(firebase_uid=request.user.uid)
+        serializer = ItineraryDetailSerializer(itineraries, many=True)
         return Response(serializer.data)
 
     def post(self, request):
         serializer = ItinerarySerializer(data=request.data)
         if serializer.is_valid():
-            # Asignamos el usuario autenticado
-            serializer.save(user=request.user)
+            serializer.save(firebase_uid=request.user.uid)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -32,33 +47,35 @@ class ItinerariesView(APIView):
 class ItineraryDetailsView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get_object(self, pk, user):
+    def get_object(self, pk, uid):
         try:
-            return Itinerary.objects.get(pk=pk, user=user)
+            return Itinerary.objects.get(pk=pk, firebase_uid=uid)
         except Itinerary.DoesNotExist:
             return None
 
     def get(self, request, pk):
-        itinerary = self.get_object(pk, request.user)
+        itinerary = self.get_object(pk, request.user.uid)
         if not itinerary:
-            return Response({"error": "Ups! Itinenary not found."}, status=status.HTTP_404_NOT_FOUND)
-        serializer = ItinerarySerializer(itinerary)
+            return Response({"error": "Itinerary not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = ItineraryDetailSerializer(itinerary)
         return Response(serializer.data)
 
     def put(self, request, pk):
-        itinerary = self.get_object(pk, request.user)
+        itinerary = self.get_object(pk, request.user.uid)
         if not itinerary:
-            return Response({"error": "Ups! Itinenary not found."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Itinerary not found."}, status=status.HTTP_404_NOT_FOUND)
+
         serializer = ItinerarySerializer(itinerary, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save(user=request.user)  # Asegura que no cambie el usuario
+            serializer.save(firebase_uid=request.user.uid)
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk):
-        itinerary = self.get_object(pk, request.user)
+        itinerary = self.get_object(pk, request.user.uid)
         if not itinerary:
-            return Response({"error": "Ups! Itinenary not found."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Itinerary not found."}, status=status.HTTP_404_NOT_FOUND)
         itinerary.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -67,19 +84,16 @@ class ActivityListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # Solo actividades de itinerarios del usuario autenticado
-        activities = Activity.objects.filter(itinerary__user=request.user)
+        activities = Activity.objects.filter(itinerary__firebase_uid=request.user.uid)
         serializer = ActivitySerializer(activities, many=True)
         return Response(serializer.data)
 
     def post(self, request):
         itinerary_id = request.data.get('itinerary')
-
-        # Validar que el itinerario pertenece al usuario autenticado
         try:
-            itinerary = Itinerary.objects.get(id=itinerary_id, user=request.user)
+            itinerary = Itinerary.objects.get(id=itinerary_id, firebase_uid=request.user.uid)
         except Itinerary.DoesNotExist:
-            return Response({"error": "Ups! The itinerary is invalid or does not match the user."}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": "Invalid itinerary or not owned by user."}, status=status.HTTP_403_FORBIDDEN)
 
         serializer = ActivitySerializer(data=request.data)
         if serializer.is_valid():
@@ -87,36 +101,36 @@ class ActivityListCreateView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 class ActivityDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get_object(self, pk, user):
+    def get_object(self, pk, uid):
         try:
             activity = Activity.objects.select_related('itinerary').get(pk=pk)
-            if activity.itinerary.user != user:
+            if activity.itinerary.firebase_uid != uid:
                 return None
             return activity
         except Activity.DoesNotExist:
             return None
 
     def get(self, request, pk):
-        activity = self.get_object(pk, request.user)
+        activity = self.get_object(pk, request.user.uid)
         if not activity:
-            return Response({"error": "Oh oh! Antivity not found or unauthorized."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Activity not found or unauthorized."}, status=status.HTTP_404_NOT_FOUND)
         serializer = ActivitySerializer(activity)
         return Response(serializer.data)
 
     def put(self, request, pk):
-        activity = self.get_object(pk, request.user)
+        activity = self.get_object(pk, request.user.uid)
         if not activity:
-            return Response({"error": "Oh oh! Antivity not found or unauthorized."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Activity not found or unauthorized."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Validar si el usuario intenta cambiar el itinerario
         if "itinerary" in request.data:
             try:
-                Itinerary.objects.get(id=request.data["itinerary"], user=request.user)
+                Itinerary.objects.get(id=request.data["itinerary"], firebase_uid=request.user.uid)
             except Itinerary.DoesNotExist:
-                return Response({"error": "You may not transfer this activity to an Itinerary other than your own."}, status=status.HTTP_403_FORBIDDEN)
+                return Response({"error": "Cannot assign activity to itinerary not owned by you."}, status=status.HTTP_403_FORBIDDEN)
 
         serializer = ActivitySerializer(activity, data=request.data, partial=True)
         if serializer.is_valid():
@@ -125,9 +139,9 @@ class ActivityDetailView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk):
-        activity = self.get_object(pk, request.user)
+        activity = self.get_object(pk, request.user.uid)
         if not activity:
-            return Response({"error": "Oh oh! Antivity not found or unauthorized."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Activity not found or unauthorized."}, status=status.HTTP_404_NOT_FOUND)
         activity.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
