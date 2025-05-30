@@ -28,6 +28,10 @@ from .serializers import (
     ActivitySerializer
 )
 
+import joblib
+import os
+import pandas as pd
+
 class ItinerariesView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -148,53 +152,55 @@ class ActivityDetailView(APIView):
 
 
 
-'''
-
-# Cargar el modelo de predicción.
-# BASE_DIR obtiene el directorio base del proyecto, que es útil para construir rutas relativas.
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# model_path construye la ruta completa al archivo del modelo utilizando la ruta base.
+# Cargar el modelo
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Un solo nivel arriba, la raíz del proyecto
 model_path = os.path.join(BASE_DIR, 'model', 'modelo_temperatura_random_forest.pkl')
-# Cargamos el modelo desde el archivo .pkl utilizando joblib.
-model = joblib.load(model_path) 
 
-# Definimos una clase que maneja las predicciones de temperatura, heredando de APIView.
+try:
+    model = joblib.load(model_path)
+except FileNotFoundError:
+    print(f"Error: No se encontró el modelo en {model_path}")
+    print("Por favor, asegúrate de que el archivo modelo_temperatura_random_forest.pkl existe en la carpeta 'model'")
+    model = None
+
 class PrediccionTemperatura(APIView):
-    # Este método se ejecuta cuando se recibe una solicitud POST.
     def post(self, request):
-        # Obtenemos los datos enviados en la solicitud.
+        if model is None:
+            return Response(
+                {'error': 'El modelo no está disponible. Por favor, contacta al administrador.'}, 
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+
         data = request.data
         
-        try:
-            # Creamos una lista con las características necesarias para el modelo de predicción.
-            features = {
-                'tavg': data.get('tavg'),      
-                'tmin': data.get('tmin'),      
-                'tmax': data.get('tmax'),      
-                'prcp': data.get('prcp'),      
-                'wdir': data.get('wdir'),      
-                'wspd': data.get('wspd'),      
-                'pres': data.get('pres'),      
-                'latitude': data.get('latitude'),  
+        try: 
+            # Definir los nombres de las características
+            feature_names = ['tavg', 'tmin', 'tmax', 'prcp', 'wdir', 'wspd', 'pres', 'latitude', 'longitude']
+            
+            # Crear un diccionario con los datos
+            features_dict = {
+                'tavg': data.get('tavg'),
+                'tmin': data.get('tmin'),
+                'tmax': data.get('tmax'),
+                'prcp': data.get('prcp'),
+                'wdir': data.get('wdir'),
+                'wspd': data.get('wspd'),
+                'pres': data.get('pres'),
+                'latitude': data.get('latitude'),
                 'longitude': data.get('longitude')
             }
             
-            # Verificamos que no haya valores nulos o faltantes en las características.
-            if None in features:
-                # Si hay datos faltantes, devolvemos un error con código 400 (Bad Request).
+            # Verificar que no haya valores nulos o faltantes
+            if None in features_dict.values():
                 return Response({'error': 'Faltan datos necesarios'}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Realizamos la predicción utilizando el modelo cargado.
-            # La función predict espera una lista de listas, por lo que envolvemos features en otra lista.
-            df_dia = pd.DataFrame([features])
-            prediccion = model.predict(df_dia)[0]
+            # Crear un DataFrame con los datos y los nombres de las características
+            features_df = pd.DataFrame([features_dict])
             
-            # Devolvemos la predicción como respuesta en formato JSON con código 200 (OK).
-            return Response({prediccion}, status=status.HTTP_200_OK)
+            # Realizar la predicción
+            prediccion = model.predict(features_df)[0]
+            
+            # Devolver la predicción como respuesta en formato JSON
+            return Response({'temperatura_predicha': prediccion}, status=status.HTTP_200_OK)
         except Exception as e:
-            # En caso de un error inesperado, devolvemos el mensaje de error con código 500 (Internal Server Error).
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-            
-'''
-

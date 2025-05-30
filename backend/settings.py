@@ -18,7 +18,7 @@ import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-FIREBASE_CRED_PATH = os.path.join(BASE_DIR, 'config/firebase_key.json')
+FIREBASE_CRED_PATH = os.path.join(BASE_DIR, 'config/firebase_auth.json')
 
 if not firebase_admin._apps:
     cred = credentials.Certificate(FIREBASE_CRED_PATH)

@@ -2,5 +2,5 @@ from django.urls import path
 from .views import ItineraryView
 
 urlpatterns = [
-    path("itinerary/", ItineraryView.as_view(), name="itinerary"),
+    path("ai/itinerary/", ItineraryView.as_view(), name="itinerary"),
 ]
