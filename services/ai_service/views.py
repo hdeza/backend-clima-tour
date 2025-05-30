@@ -2,59 +2,169 @@ import os
 import google.generativeai as genai
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework import status  # Para manejar códigos de estado HTTP.
+from rest_framework import status
 from django.conf import settings
+import json
 
 # Configura la API de Gemini
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 class ItineraryView(APIView):
     def post(self, request):
-        # Recibe la ciudad y temperatura desde la solicitud
         city = request.data.get("city")
         temperature = request.data.get("temperature")
         days = request.data.get("days")
 
-        # Define el prompt con los parámetros proporcionados
-        prompt = f"Imagine you're a local guide in {city} and your mission is to take me on an unforgettable {days}-day experience in this city. The average temperature will be around {temperature}°C, so recommend exciting activities for each day to make the most of it. Tell me everything as if we were chatting in person: I want every activity to sound exciting, and give me practical suggestions on how to enjoy it to the fullest, such as tips on what to bring or interesting details about the place. Describe everything in a smooth, engaging way, without lists or sections. Take me day by day through the adventure as if you were accompanying me! The response must be in English. Please ensure that the total response, including both your input and output, does not exceed 800 tokens."
+        # Prompt optimizado para generar JSON más conciso y dentro del límite de tokens
+        prompt = f"""
+        Create a {days}-day travel itinerary for {city} with temperature {temperature}°C.
+        
+        Return ONLY valid JSON with this exact structure:
+        {{
+            "itinerary": {{
+                "city": "{city}",
+                "predicted_temperature": {temperature},
+                "state": "planificado"
+            }},
+            "activities": [
+                {{
+                    "hour": "HH:MM:SS",
+                    "description": "Brief activity description (max 80 words)",
+                    "state": "pendiente"
+                }}
+            ]
+        }}
+        
+        Requirements:
+        - Generate {days * 3} activities distributed across {days} day(s)
+        - Keep descriptions under 80 words each
+        - Use realistic hours (08:00:00 to 20:00:00)
+        - Activities should match the temperature of {temperature}°C
+        - Response must be valid JSON only, no extra text
+        - All descriptions in English
+        """
 
-        # Instanciar el modelo de Gemini 
         model = genai.GenerativeModel('gemini-1.5-flash')
 
         try:
-            # Enviar el prompt a la API de Gemini
+            response = model.generate_content(
+                prompt, 
+                generation_config=genai.types.GenerationConfig(
+                    candidate_count=1,
+                    max_output_tokens=1500,  # Aumentado para dar más espacio
+                    temperature=0.3,  # Reducido para más consistencia
+                )
+            )
+
+            # Limpiar la respuesta de Gemini
+            gemini_response_text = response.text.strip()
             
-            #candidateCount especifica la cantidad de respuestas generadas que se mostrarán. Actualmente, este valor solo se puede establecer en 1. 
+            # Remover markdown si existe
+            if gemini_response_text.startswith("```json"):
+                gemini_response_text = gemini_response_text[len("```json"):].strip()
+            if gemini_response_text.endswith("```"):
+                gemini_response_text = gemini_response_text[:-len("```")].strip()
+            
+            # Remover cualquier texto antes del JSON
+            start_idx = gemini_response_text.find('{')
+            if start_idx > 0:
+                gemini_response_text = gemini_response_text[start_idx:]
+            
+            # Remover cualquier texto después del JSON
+            # Encontrar el último } que cierre el JSON principal
+            brace_count = 0
+            last_brace_idx = -1
+            for i, char in enumerate(gemini_response_text):
+                if char == '{':
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        last_brace_idx = i
+                        break
+            
+            if last_brace_idx > 0:
+                gemini_response_text = gemini_response_text[:last_brace_idx + 1]
 
-            #stopSequences especifica el conjunto de secuencias de caracteres (hasta 5) que detendrán la generación de resultados. 
-            # Si se especifica, la API se detendrá cuando aparezca un stop_sequence por primera vez. La secuencia de detención no se incluirá como parte de la respuesta.
+            print(f"Cleaned Gemini response: {gemini_response_text[:500]}...")  # Log para debug
 
-            #maxOutputTokens establece la cantidad máxima de tokens que se deben incluir en un candidato.
+            try:
+                # Intentar parsear el JSON
+                itinerary_data = json.loads(gemini_response_text)
+                
+                # Validar estructura del JSON
+                if 'itinerary' not in itinerary_data or 'activities' not in itinerary_data:
+                    raise ValueError("Invalid JSON structure: missing 'itinerary' or 'activities'")
+                
+                # Validar que activities sea una lista
+                if not isinstance(itinerary_data['activities'], list):
+                    raise ValueError("'activities' must be a list")
+                
+                # Asegurar que predicted_temperature sea float
+                if 'predicted_temperature' in itinerary_data['itinerary']:
+                    itinerary_data['itinerary']['predicted_temperature'] = float(
+                        itinerary_data['itinerary']['predicted_temperature']
+                    )
 
-            #temperature controla la aleatorización de la salida. Usa valores más altos para obtener respuestas más creativas 
-            # y valores más bajos para respuestas más deterministas. Los valores pueden variar de [0.0, 2.0].
+                # Validar cada actividad
+                for i, activity in enumerate(itinerary_data['activities']):
+                    if not all(key in activity for key in ['hour', 'description', 'state']):
+                        # Si falta algún campo, completarlo
+                        activity.setdefault('hour', f"{8 + (i * 2):02d}:00:00")
+                        activity.setdefault('description', f"Activity {i + 1} in {city}")
+                        activity.setdefault('state', 'pendiente')
 
-            response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(
-        # Only one candidate for now.
-        candidate_count=1,
-        max_output_tokens=800,
-        temperature=0.7,
-    ), )
-            return Response(response.text, status=status.HTTP_200_OK)
-        
+                print(f"Successfully parsed itinerary with {len(itinerary_data['activities'])} activities")
+                return Response(itinerary_data, status=status.HTTP_200_OK)
+                
+            except json.JSONDecodeError as json_e:
+                print(f"JSON decode error: {json_e}")
+                print(f"Raw response length: {len(gemini_response_text)}")
+                print(f"Raw response: {gemini_response_text}")
+                
+                # Fallback: crear un itinerario básico
+                fallback_itinerary = self.create_fallback_itinerary(city, temperature, days)
+                return Response(fallback_itinerary, status=status.HTTP_200_OK)
+                
+            except ValueError as val_e:
+                print(f"Validation error: {val_e}")
+                fallback_itinerary = self.create_fallback_itinerary(city, temperature, days)
+                return Response(fallback_itinerary, status=status.HTTP_200_OK)
+
         except Exception as e:
             print(f"Error generating content: {str(e)}")
-            return Response({"error": str(e)}, status=400)
+            # En caso de error, devolver un itinerario básico
+            fallback_itinerary = self.create_fallback_itinerary(city, temperature, days)
+            return Response(fallback_itinerary, status=status.HTTP_200_OK)
 
-
+    def create_fallback_itinerary(self, city, temperature, days):
+        """Crea un itinerario básico en caso de fallo de Gemini"""
+        activities = []
         
-# Asi se debe enviar la información al post de la api: 
+        base_activities = [
+            ("09:00:00", f"Explore the historic center of {city}"),
+            ("12:00:00", f"Lunch at a local restaurant in {city}"),
+            ("15:00:00", f"Visit local attractions and parks in {city}"),
+            ("18:00:00", f"Evening stroll and dinner in {city}")
+        ]
+        
+        for day in range(days):
+            for hour, desc in base_activities:
+                activities.append({
+                    "hour": hour,
+                    "description": f"Day {day + 1}: {desc}. Temperature: {temperature}°C",
+                    "state": "pendiente"
+                })
+        
+        return {
+            "itinerary": {
+                "city": city,
+                "predicted_temperature": float(temperature),
+                "state": "planificado"
+            },
+            "activities": activities[:days * 3]  # Limitar a 3 actividades por día
+        }
 
-#{
-#  "city": "Bogotá",
-#  "temperature": 20,
-#  "days": 2
-#}
 
 class GeminiProxyView(APIView):
     def post(self, request):
@@ -63,19 +173,16 @@ class GeminiProxyView(APIView):
             if not prompt:
                 return Response({'error': 'Prompt is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Configurar la API de Gemini
             genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
             model = genai.GenerativeModel('gemini-pro')
-            
-            # Generar respuesta
+
             response = model.generate_content(prompt)
-            
+
             return Response({
                 'response': response.text
             }, status=status.HTTP_200_OK)
-            
+
         except Exception as e:
             return Response({
                 'error': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
